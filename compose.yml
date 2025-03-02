@@ -3,6 +3,8 @@ services:
     build: .
     container_name: dns-updater
     restart: always
+    environment:
+      - TZ=Asia/Kolkata
     env_file: 
       - .env
     volumes:
