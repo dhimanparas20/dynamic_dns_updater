@@ -1,0 +1,14 @@
+services:
+  dns-updater:
+    build: .
+    container_name: dns-updater
+    restart: always
+    env_file: 
+      - .env
+    volumes:
+      - dns-logs:/var/log/freedns
+      - dns-config:/etc/freedns
+
+volumes:
+  dns-logs:
+  dns-config:
