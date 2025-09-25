@@ -142,7 +142,7 @@ sudo docker compose down
    sudo docker compose build
    sudo docker compose up -d
    sudo docker exec -it caddy caddy fmt --overwrite /etc/caddy/Caddyfile
-   sudo docker compose restrat caddy
+   sudo docker compose restart caddy
    ```
 
 ---
