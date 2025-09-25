@@ -65,13 +65,13 @@ This project provides a simple and automated way to update your Dynamic DNS (DDN
 3. **Build the Docker Image**:
    Build the Docker image using Docker Compose:
    ```bash
-   docker-compose build
+   sudo docker compose build
    ```
 
 4. **Run the Container**:
    Start the container in detached mode:
    ```bash
-   docker-compose up -d
+   sudo docker compose up -d
    ```
 
 ---
@@ -86,7 +86,7 @@ This project provides a simple and automated way to update your Dynamic DNS (DDN
    - Log all actions (e.g., IP checks, updates) to `/var/log/freedns/dnsactual.log`.
 3. You can monitor the logs using:
    ```bash
-   docker logs -f dns-updater
+   sudo docker logs -f dns-updater
    ```
 
 ---
@@ -115,7 +115,7 @@ Sun Mar  2 12:49:53 UTC 2025: DNS updated successfully.
 
 To stop the container, run:
 ```bash
-docker-compose down
+sudo docker compose down
 ```
 
 ---
@@ -133,14 +133,16 @@ docker-compose down
    - Verify your token is correct.
    - Check the logs for errors:
      ```bash
-     docker logs dns-updater
+     sudo docker logs dns-updater
      ```
 
 3. **Rebuild the Container**:
    If you make changes to the script or `.env` file, rebuild the container:
    ```bash
-   docker-compose build
-   docker-compose up -d
+   sudo docker compose build
+   sudo docker compose up -d
+   sudo docker exec -it caddy caddy fmt --overwrite /etc/caddy/Caddyfile
+   sudo docker compose restrat caddy
    ```
 
 ---
