@@ -5,6 +5,11 @@ UPDATE_URL="https://freedns.afraid.org/dynamic/update.php"
 CONF_FILE="/etc/freedns/dnsactual.conf"
 LOG_FILE="/var/log/freedns/dnsactual.log"
 
+# Set update interval (in hours, default to 1)
+UPDATE_INTERVAL=${UPDATE_INTERVAL:-1}
+# Convert hours to seconds
+SLEEP_SECONDS=$((UPDATE_INTERVAL * 3600))
+
 # Function to get formatted date
 log_date() {
     date '+%a %b %d %I:%M:%S %p %Z %Y'
@@ -15,9 +20,9 @@ log() {
     echo "$(log_date): $1" | tee -a "$LOG_FILE"
 }
 
-# Check if the TOKEN environment variable is set
-if [ -z "$TOKEN" ]; then
-    log "ERROR - TOKEN environment variable is not set. Exiting."
+# Check if the FREEDNS_TOKEN environment variable is set
+if [ -z "$FREEDNS_TOKEN" ]; then
+    log "ERROR - FREEDNS_TOKEN environment variable is not set. Exiting."
     exit 1
 fi
 
@@ -48,7 +53,7 @@ if [ "$CURRENT_IP" = "$CACHED_IP" ]; then
 else
     # Update the DNS and log the action
     log "IP has changed or first run. Updating DNS with new IP ($CURRENT_IP)."
-    wget -q -O /dev/null "$UPDATE_URL?$TOKEN"
+    wget -q -O /dev/null "$UPDATE_URL?$FREEDNS_TOKEN"
     if [ $? -eq 0 ]; then
         log "DNS updated successfully."
     else

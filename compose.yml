@@ -1,12 +1,12 @@
 services:
-  dns-updater:
+  ddns:
     build: .
-    container_name: dns-updater
+    container_name: ddns
     restart: always
     environment:
       - TZ=Asia/Kolkata
-    env_file: 
-      - .env
+      - FREEDNS_TOKEN=${FREEDNS_TOKEN}
+      - UPDATE_INTERVAL=${UPDATE_INTERVAL:-1}
     volumes:
       - dns-logs:/var/log/freedns
       - dns-config:/etc/freedns
