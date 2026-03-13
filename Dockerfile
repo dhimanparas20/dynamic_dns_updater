@@ -12,9 +12,9 @@ ENV LOG_FILE=/var/log/freedns/dnsactual.log
 RUN mkdir -p /etc/freedns /var/log/freedns /var/run/freedns
 
 # Copy scripts into the container
-COPY update-script.sh /usr/local/bin/update-script.sh
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY healthcheck.sh /usr/local/bin/healthcheck.sh
+COPY scripts/update-script.sh /usr/local/bin/update-script.sh
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY scripts/healthcheck.sh /usr/local/bin/healthcheck.sh
 RUN chmod +x /usr/local/bin/update-script.sh /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh
 
 # Healthcheck validates periodic attempts and recent successful runs.

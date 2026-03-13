@@ -1,38 +1,40 @@
-# Dynamic DNS Updater
+# Dynamic DNS Updater for FreeDNS
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/dhimanparas20/ddns)](https://hub.docker.com/r/dhimanparas20/ddns)
 [![Docker Stars](https://img.shields.io/docker/stars/dhimanparas20/ddns)](https://hub.docker.com/r/dhimanparas20/ddns)
 
-Automatically keep your FreeDNS subdomain synchronized with your dynamic public IP address. Lightweight, reliable, and easy to deploy.
+Production-ready container that keeps your FreeDNS subdomains synced with your dynamic public IP.
 
----
+## What This Image Does
 
-## What is this?
+- Detects your public IP using reliable fallback endpoints.
+- Calls FreeDNS dynamic update URL when needed.
+- Supports either:
+  - Full FreeDNS direct URL (`FREEDNS_UPDATE_URL`) (recommended)
+  - Raw FreeDNS token (`FREEDNS_TOKEN`)
+- Handles retries/timeouts and network edge cases (IPv4 forcing + HTTP fallback).
+- Maintains state/logs for reliable health checks.
 
-This container monitors your public IP address and automatically updates your FreeDNS (afraid.org) subdomain whenever your IP changes. Perfect for:
-
-- Home servers behind dynamic IPs
-- Remote access to home networks
-- Self-hosted services (Nextcloud, Plex, etc.)
-- NAS systems (Synology, QNAP, etc.)
-- IoT projects requiring consistent domain access
-
----
-
-## Quick Start
-
-### Docker Compose (Recommended)
+## Quick Start (Docker Compose)
 
 ```yaml
 services:
   ddns:
     image: dhimanparas20/ddns:latest
     container_name: ddns
-    restart: always
+    restart: unless-stopped
     environment:
-      - FREEDNS_TOKEN=your_token_here
-      - UPDATE_INTERVAL=1
-      - TZ=Asia/Kolkata
+      TZ: Asia/Calcutta
+      FREEDNS_UPDATE_URL: ${FREEDNS_UPDATE_URL}
+      # Optional alternative to FREEDNS_UPDATE_URL:
+      # FREEDNS_TOKEN: ${FREEDNS_TOKEN}
+      UPDATE_INTERVAL: 1
+      FREEDNS_REQUEST_TIMEOUT_SECONDS: 15
+      FREEDNS_CONNECT_TIMEOUT_SECONDS: 8
+      FREEDNS_RETRY_COUNT: 1
+      FREEDNS_FORCE_IPV4: 1
+      FREEDNS_ALLOW_HTTP_FALLBACK: 1
+      FORCE_UPDATE_EACH_CYCLE: 0
     volumes:
       - dns-logs:/var/log/freedns
       - dns-config:/etc/freedns
@@ -42,105 +44,104 @@ volumes:
   dns-config:
 ```
 
-### Docker Run
+Run:
+
+```bash
+docker compose up -d
+```
+
+## Quick Start (docker run)
 
 ```bash
 docker run -d \
   --name ddns \
-  --restart always \
-  -e FREEDNS_TOKEN=your_token_here \
+  --restart unless-stopped \
+  -e TZ=Asia/Calcutta \
+  -e FREEDNS_UPDATE_URL='https://freedns.afraid.org/dynamic/update.php?YOUR_TOKEN' \
   -e UPDATE_INTERVAL=1 \
   -v dns-logs:/var/log/freedns \
+  -v dns-config:/etc/freedns \
   dhimanparas20/ddns:latest
 ```
 
----
-
-## Setup Instructions
-
-### 1. Get Your FreeDNS Token
-
-1. Create an account at [FreeDNS](https://freedns.afraid.org/)
-2. Add a subdomain (e.g., `myhome.mooo.com`)
-3. Navigate to **Dynamic DNS** section
-4. Copy your Direct URL token (the part after `update.php?`)
-
-### 2. Configure & Run
-
-Replace `your_token_here` in the commands above with your actual token.
-
----
-
-## Features
-
-- ✅ Automatic IP detection
-- ✅ Smart updates (only when IP changes)
-- ✅ Configurable check interval
-- ✅ Persistent logs and IP cache
-- ✅ Health check monitoring
-- ✅ Minimal resource usage (~15MB image)
-- ✅ Multi-architecture support
-
----
-
-## Environment Variables
+## Configuration
 
 | Variable | Description | Default |
-|----------|-------------|---------|
-| `FREEDNS_TOKEN` | Your FreeDNS token (required) | - |
-| `UPDATE_INTERVAL` | Hours between checks | 1 |
-| `TZ` | Container timezone | Asia/Kolkata |
+|---|---|---|
+| `FREEDNS_UPDATE_URL` | Full direct URL from FreeDNS Dynamic DNS page | empty |
+| `FREEDNS_TOKEN` | Raw token from direct URL (used if `FREEDNS_UPDATE_URL` is not set) | empty |
+| `UPDATE_INTERVAL` | Check interval in hours | `1` |
+| `TZ` | Log timezone | `UTC` (image), `Asia/Calcutta` in compose default |
+| `FREEDNS_REQUEST_TIMEOUT_SECONDS` | Max time per request attempt | `15` |
+| `FREEDNS_CONNECT_TIMEOUT_SECONDS` | TCP connect timeout | `8` |
+| `FREEDNS_RETRY_COUNT` | Curl retries per URL | `1` |
+| `FREEDNS_FORCE_IPV4` | Use IPv4 for FreeDNS calls (`1`/`0`) | `1` |
+| `FREEDNS_ALLOW_HTTP_FALLBACK` | Try HTTP if HTTPS fails (`1`/`0`) | `1` |
+| `FORCE_UPDATE_EACH_CYCLE` | Always call FreeDNS, skip local IP cache compare (`1`/`0`) | `0` |
+| `HEALTHCHECK_GRACE_SECONDS` | Extra health grace window | `600` |
 
-### Ways to Pass Your Token
+At least one of `FREEDNS_UPDATE_URL` or `FREEDNS_TOKEN` must be provided.
 
-**Option 1: Using `.env` file (Recommended)**
-Create a `.env` file in the same directory as your compose file:
-```env
-FREEDNS_TOKEN=your_token_here
-UPDATE_INTERVAL=1
-```
-Then run: `docker compose up -d`
+## Healthcheck
 
-**Option 2: Direct environment variable**
-```bash
-FREEDNS_TOKEN=your_token_here docker compose up -d
-```
+This image includes a built-in Docker healthcheck. It marks healthy when:
 
-**Option 3: Hardcode in compose (Not recommended)**
-Replace `your_token_here` directly in the compose file with your actual token.
+- update attempts are happening on schedule
+- and at least one recent cycle completed successfully
 
----
+Check status:
 
-## Monitoring
-
-View real-time logs:
-```bash
-docker logs -f ddns
-```
-
-Check health status:
 ```bash
 docker inspect --format='{{.State.Health.Status}}' ddns
 ```
 
----
+## Logs
+
+Follow logs:
+
+```bash
+docker logs -f ddns
+```
+
+Typical successful update log:
+
+```text
+FreeDNS update acknowledged: Updated 5 host(s) ... to <IP>
+Update cycle completed successfully.
+```
+
+Typical no-change log (healthy behavior):
+
+```text
+No update required. Current IP matches cached IP (...)
+Update cycle completed successfully.
+```
+
+## Getting Your FreeDNS URL/Token
+
+1. Go to https://freedns.afraid.org/
+2. Open `Dynamic DNS`
+3. Copy your direct URL, e.g.:
+   `https://freedns.afraid.org/dynamic/update.php?YOUR_TOKEN`
+4. Use either:
+   - Full URL in `FREEDNS_UPDATE_URL`
+   - Token part only in `FREEDNS_TOKEN`
+
+## Troubleshooting
+
+- `FreeDNS request failed` with timeout:
+  - Verify network access from host/container to `freedns.afraid.org`
+  - Keep `FREEDNS_FORCE_IPV4=1`
+  - Keep `FREEDNS_ALLOW_HTTP_FALLBACK=1`
+- `FreeDNS returned an error response`:
+  - Re-check URL/token for the correct subdomain/account
+- Container exits immediately:
+  - Ensure `FREEDNS_UPDATE_URL` or `FREEDNS_TOKEN` is set
 
 ## Tags
 
-- `latest` - Current stable release
-
----
-
-## Support
-
-- 📖 [Full Documentation](https://github.com/dhimanparas20/dynamic_dns_updater)
-- 🐛 [Issue Tracker](https://github.com/dhimanparas20/dynamic_dns_updater/issues)
-- ⭐ [Star on GitHub](https://github.com/dhimanparas20/dynamic_dns_updater)
-
----
+- `latest`: newest stable image
 
 ## License
 
-This project is licensed under the [MIT License](https://github.com/dhimanparas20/dynamic_dns_updater/blob/main/LICENSE.md).
-
-Free to use and modify, but please mention the original author: **Paras Dhiman (dhimanparas20)**.
+MIT License. See `LICENSE.md`.

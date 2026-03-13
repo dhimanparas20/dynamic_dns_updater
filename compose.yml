@@ -5,7 +5,7 @@ services:
     container_name: ddns
     restart: unless-stopped
     environment:
-      TZ: ${TZ:-Asia/Kolkata}
+      TZ: ${TZ:-Asia/Calcutta}
       FREEDNS_TOKEN: ${FREEDNS_TOKEN:-}
       FREEDNS_UPDATE_URL: ${FREEDNS_UPDATE_URL:-}
       UPDATE_INTERVAL: ${UPDATE_INTERVAL:-1}

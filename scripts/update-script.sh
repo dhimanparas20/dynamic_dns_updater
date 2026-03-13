@@ -231,11 +231,8 @@ if (( REQUEST_EXIT_CODE != 0 )); then
     exit 1
 fi
 
-if [[ "${SANITIZED_RESPONSE}" =~ [Ee][Rr][Rr][Oo][Rr] ]]; then
-    log "ERROR - FreeDNS returned an error response: ${SANITIZED_RESPONSE}"
-    exit 1
-fi
-
+# FreeDNS sometimes returns strings like "ERROR: Address x.x.x.x has not changed."
+# That should be considered a healthy, successful no-op update.
 if [[ "${SANITIZED_RESPONSE}" =~ ([Uu]pdated|[Hh]as[[:space:]]not[[:space:]]changed|[Nn]o[[:space:]]update[[:space:]]required|[Aa]lready) ]]; then
     if [[ -n "${CURRENT_IP}" ]]; then
         printf '%s\n' "${CURRENT_IP}" > "${CONF_FILE}"
@@ -244,6 +241,11 @@ if [[ "${SANITIZED_RESPONSE}" =~ ([Uu]pdated|[Hh]as[[:space:]]not[[:space:]]chan
     mark_success
     log "FreeDNS update acknowledged: ${SANITIZED_RESPONSE}"
     exit 0
+fi
+
+if [[ "${SANITIZED_RESPONSE}" =~ [Ee][Rr][Rr][Oo][Rr] ]]; then
+    log "ERROR - FreeDNS returned an error response: ${SANITIZED_RESPONSE}"
+    exit 1
 fi
 
 log "ERROR - FreeDNS response did not confirm success: ${SANITIZED_RESPONSE}"
