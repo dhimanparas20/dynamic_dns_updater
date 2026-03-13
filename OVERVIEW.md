@@ -57,7 +57,7 @@ docker run -d \
   --name ddns \
   --restart unless-stopped \
   -e TZ=Asia/Calcutta \
-  -e FREEDNS_UPDATE_URL='https://freedns.afraid.org/dynamic/update.php?YOUR_TOKEN' \
+  -e FREEDNS_TOKEN=your_token \
   -e UPDATE_INTERVAL=1 \
   -v dns-logs:/var/log/freedns \
   -v dns-config:/etc/freedns \
