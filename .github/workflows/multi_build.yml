@@ -2,6 +2,12 @@ name: Build and push for both x86_64 and arm64
 
 on:
   workflow_dispatch:
+    inputs:
+      push_to_ghcr:
+        description: Also push images to GitHub Container Registry (ghcr.io)
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   build-and-push:
@@ -10,6 +16,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+
+    env:
+      PUSH_TO_GHCR: ${{ inputs.push_to_ghcr }}
 
     steps:
       - name: Checkout repository
@@ -41,16 +50,33 @@ jobs:
       # Login to GitHub Container Registry (GHCR)
       # -------------------------------
       - name: Login to GHCR
+        if: ${{ env.PUSH_TO_GHCR == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ env.OWNER_LC }}
-          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+          # Prefer a PAT for GHCR when publishing a package name that doesn't match the repo name (e.g. "ddns"),
+          # otherwise pushes may fail with 403 depending on package ownership/settings.
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.MY_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
 
       # -------------------------------
       # Build and Push for x86_64
       # -------------------------------
+      - name: Build and push (x86_64) to Docker Hub
+        if: ${{ env.PUSH_TO_GHCR != 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/ddns:x86_64
+          cache-from: type=gha,scope=ddns-amd64
+          cache-to: type=gha,mode=max,scope=ddns-amd64
+
       - name: Build and push (x86_64) to Docker Hub + GHCR
+        if: ${{ env.PUSH_TO_GHCR == 'true' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -66,7 +92,21 @@ jobs:
       # -------------------------------
       # Build and Push for arm64
       # -------------------------------
+      - name: Build and push (arm64) to Docker Hub
+        if: ${{ env.PUSH_TO_GHCR != 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/ddns:arm64
+          cache-from: type=gha,scope=ddns-arm64
+          cache-to: type=gha,mode=max,scope=ddns-arm64
+
       - name: Build and push (arm64) to Docker Hub + GHCR
+        if: ${{ env.PUSH_TO_GHCR == 'true' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -90,6 +130,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/ddns:arm64
 
       - name: Create and push multi-arch manifest (GHCR)
+        if: ${{ env.PUSH_TO_GHCR == 'true' }}
         run: |
           docker buildx imagetools create \
             -t ghcr.io/${{ env.OWNER_LC }}/ddns:latest \
