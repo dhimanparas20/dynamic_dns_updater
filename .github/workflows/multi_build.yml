@@ -1,4 +1,4 @@
-name: Docker Image CI
+name: Build and push for both x86_64 and arm64
 
 on:
   workflow_dispatch:
@@ -35,14 +35,29 @@ jobs:
           password: ${{ secrets.MY_GITHUB_TOKEN }}
 
       # -------------------------------
-      # Build and Push
+      # Build and Push for x86_64
       # -------------------------------
       - name: Build and Push Docker image to both registries
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/ddns:latest
-            ghcr.io/${{ github.repository_owner }}/ddns:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/ddns:x86_64
+            ghcr.io/${{ github.repository_owner }}/ddns:x86_64
+
+      # -------------------------------
+      # Build and Push for arm64
+      # -------------------------------
+      - name: Build and Push Docker image to both registries
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/ddns:arm64
+            ghcr.io/${{ github.repository_owner }}/ddns:arm64      
