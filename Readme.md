@@ -1,65 +1,63 @@
-# Dynamic DNS Updater
+# Dynamic DNS Updater (FreeDNS)
 
-A lightweight, automated Docker container that keeps your FreeDNS subdomain pointing to your current public IP address. Perfect for home servers, NAS systems, or any setup with a dynamic IP.
+Lightweight Docker image that keeps a FreeDNS subdomain synced with your current public IP.
 
----
+## What It Does
 
-## Features
+1. Detects your current public IP (with multiple fallback providers).
+2. Compares it with the last cached IP.
+3. Calls FreeDNS only when an update is needed.
+4. Verifies FreeDNS response text before reporting success.
+5. Stores logs and state in mounted volumes.
 
-- 🔄 Automatic IP detection and DNS updates at configurable intervals
-- 🐳 Lightweight Alpine Linux-based Docker image (~15MB)
-- 📊 Built-in health checks and comprehensive logging
-- ⚙️ Simple configuration via environment variables
-- 🚀 One-command deployment with Docker Compose
+## Key Runtime Guarantees
 
----
+- Container exits at startup if both `FREEDNS_TOKEN` and `FREEDNS_UPDATE_URL` are missing/unresolved.
+- You can configure FreeDNS either by token (`FREEDNS_TOKEN`) or by exact direct URL (`FREEDNS_UPDATE_URL`).
+- Healthcheck is based on update heartbeat timestamps, not process grep.
+- Failed update cycles are logged as failures and do not get marked successful.
 
-## Prerequisites
-
-- [FreeDNS](https://freedns.afraid.org/) account
-- Docker and Docker Compose installed
-
----
-
-## Quick Start
-
-### 1. Get Your FreeDNS Token
-
-1. Sign up at [FreeDNS](https://freedns.afraid.org/)
-2. Add a subdomain in the **Subdomains** section
-3. Go to **Dynamic DNS** and copy your Direct URL:
-   ```
-   https://freedns.afraid.org/dynamic/update.php?YOUR_TOKEN_HERE
-   ```
-4. Extract the token (everything after `update.php?`)
-
-### 2. Deploy with Docker Compose
+## Quick Start (Docker Compose)
 
 ```bash
-# Clone the repository
 git clone https://github.com/dhimanparas20/dynamic_dns_updater.git
 cd dynamic_dns_updater
-
-# Configure environment
 cp env_sample .env
-# Edit .env and add your FREEDNS_TOKEN
-
-# Start the container
-docker compose up -d
+# edit .env and set FREEDNS_UPDATE_URL (recommended) or FREEDNS_TOKEN
+docker compose up -d --build
 ```
 
-### 3. Using Docker Hub Image (Pre-built)
+## Configuration
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `FREEDNS_TOKEN` | FreeDNS token from direct URL | - | Yes* |
+| `FREEDNS_UPDATE_URL` | Full FreeDNS direct update URL | - | Yes* |
+| `UPDATE_INTERVAL` | Check interval in hours (positive integer) | `1` | No |
+| `TZ` | Time zone for logs | `UTC` | No |
+| `HEALTHCHECK_GRACE_SECONDS` | Extra buffer for health staleness checks | `600` | No |
+| `FREEDNS_REQUEST_TIMEOUT_SECONDS` | Max duration for one FreeDNS request attempt | `15` | No |
+| `FREEDNS_CONNECT_TIMEOUT_SECONDS` | Connection timeout for FreeDNS requests | `8` | No |
+| `FREEDNS_RETRY_COUNT` | Curl retry count per URL | `1` | No |
+| `FREEDNS_FORCE_IPV4` | Force IPv4 for FreeDNS request (`1` or `0`) | `1` | No |
+| `FREEDNS_ALLOW_HTTP_FALLBACK` | Try `http://` FreeDNS URL if `https://` times out (`1` or `0`) | `1` | No |
+| `FORCE_UPDATE_EACH_CYCLE` | Skip local IP cache check and always hit FreeDNS (`1` or `0`) | `0` | No |
+
+\* Provide at least one of `FREEDNS_TOKEN` or `FREEDNS_UPDATE_URL`.
+
+## Compose Example
 
 ```yaml
 services:
   ddns:
     image: dhimanparas20/ddns:latest
     container_name: ddns
-    restart: always
+    restart: unless-stopped
     environment:
-      - TZ=Asia/Kolkata
-      - FREEDNS_TOKEN=your_token_here
-      - UPDATE_INTERVAL=1
+      TZ: Asia/Kolkata
+      FREEDNS_UPDATE_URL: ${FREEDNS_UPDATE_URL}
+      FREEDNS_TOKEN: ${FREEDNS_TOKEN}
+      UPDATE_INTERVAL: 1
     volumes:
       - dns-logs:/var/log/freedns
       - dns-config:/etc/freedns
@@ -69,117 +67,39 @@ volumes:
   dns-config:
 ```
 
----
+## Monitor
 
-## Configuration
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `FREEDNS_TOKEN` | FreeDNS token from Direct URL | - | Yes |
-| `UPDATE_INTERVAL` | Check interval in hours | 1 | No |
-| `TZ` | Timezone | Asia/Kolkata | No |
-
-### Passing the Token
-
-You have 3 ways to provide your `FREEDNS_TOKEN`:
-
-**Option 1: Using `.env` file (Recommended)**
-```bash
-# Copy the sample file
-cp env_sample .env
-
-# Edit .env and add your token
-FREEDNS_TOKEN=your_token_here
-UPDATE_INTERVAL=1
-
-# Start the container
-docker compose up -d
-```
-✅ Token isn't exposed in command history  
-✅ Easy to manage multiple variables  
-✅ Already in `.gitignore` (won't be committed)
-
-**Option 2: Pass directly via environment variable**
-```bash
-FREEDNS_TOKEN=your_token_here docker compose up -d
-```
-
-**Option 3: Hardcode in compose.yml (Not recommended)**
-```yaml
-environment:
-  - FREEDNS_TOKEN=your_actual_token_here
-```
-
----
-
-## Monitoring
-
-### View Logs
 ```bash
 docker logs -f ddns
-```
-
-### Check Health Status
-```bash
 docker inspect --format='{{.State.Health.Status}}' ddns
 ```
 
----
+## Troubleshooting
 
-## Docker Hub
+- If DNS is not updating:
+  - Verify the exact direct URL/token from FreeDNS Dynamic DNS page.
+  - Ensure the token in your `.env` matches FreeDNS generated script token for the same subdomain.
+  - If logs show `curl exit 28`, keep `FREEDNS_FORCE_IPV4=1` (default) and optionally set `FREEDNS_ALLOW_HTTP_FALLBACK=1`.
+  - Check container logs for `FreeDNS returned an error response`.
+- If container exits immediately:
+  - Confirm at least one of `FREEDNS_UPDATE_URL` or `FREEDNS_TOKEN` is set correctly.
+- If health is `unhealthy`:
+  - Check network reachability from container to IP check endpoints and FreeDNS.
 
-Pre-built images are available on Docker Hub:
-
-```bash
-docker pull dhimanparas20/ddns:latest
-```
-
-**Available Tags:**
-- `latest` - Latest stable release
-
----
-
-## Building from Source
+## Build Locally
 
 ```bash
-docker build -t ddns-updater .
+docker build -t ddns-updater:local .
 docker run -d \
+  --name ddns \
+  --restart unless-stopped \
   -e FREEDNS_TOKEN=your_token \
   -e UPDATE_INTERVAL=1 \
   -v dns-logs:/var/log/freedns \
-  --name ddns \
-  ddns-updater
+  -v dns-config:/etc/freedns \
+  ddns-updater:local
 ```
-
----
-
-## Troubleshooting
-
-**Empty logs?**
-- Verify `FREEDNS_TOKEN` is set correctly
-- Check container status: `docker ps`
-
-**DNS not updating?**
-- Verify token is correct in FreeDNS dashboard
-- Check for errors: `docker logs ddns`
-
-**Change update interval?**
-```bash
-# Edit .env, then restart
-docker compose down
-docker compose up -d
-```
-
----
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
-
-MIT License - Free to use and modify, but please mention the original author: **Paras Dhiman (dhimanparas20)**.
-
----
-
-## Contributing
-
-Contributions welcome! Please submit pull requests for improvements.
+MIT License. See [LICENSE.md](LICENSE.md).
